@@ -16,6 +16,7 @@ import { CalendarIcon, Loader2, Check, ArrowRight, MapPin, Car, Building, Clock,
 import { toast } from "@/components/ui/sonner";
 import { motion } from "framer-motion";
 
+// Type definitions
 type Area = {
   area_id: string;
   area_name: string;
@@ -27,6 +28,30 @@ type ParkingSlot = {
   slot_id: string;
   area_id: string;
   status: string | null;
+};
+
+// Animation variants
+const fadeIn = {
+  hidden: { opacity: 0, y: 20 },
+  visible: { 
+    opacity: 1, 
+    y: 0,
+    transition: { 
+      duration: 0.5,
+      ease: "easeOut"
+    }
+  }
+};
+
+const staggerChildren = {
+  hidden: { opacity: 0 },
+  visible: { 
+    opacity: 1,
+    transition: { 
+      staggerChildren: 0.1,
+      delayChildren: 0.2
+    }
+  }
 };
 
 const Book = () => {
@@ -176,6 +201,7 @@ const Book = () => {
       setIsLoading(true);
       console.log("Starting booking process...");
       
+      // Check if vehicle exists
       const { data: existingVehicleData, error: vehicleQueryError } = await supabase
         .from("vehicles")
         .select("*")
@@ -186,6 +212,7 @@ const Book = () => {
         throw vehicleQueryError;
       }
       
+      // If vehicle doesn't exist, create it
       if (!existingVehicleData || existingVehicleData.length === 0) {
         console.log("Creating new vehicle record");
         const { error: insertVehicleError } = await supabase
@@ -206,6 +233,19 @@ const Book = () => {
         console.log("Vehicle already exists");
       }
       
+      // Get area name for the booking record
+      const { data: areaData, error: areaError } = await supabase
+        .from("areas")
+        .select("area_name")
+        .eq("area_id", selectedArea)
+        .single();
+      
+      if (areaError) {
+        console.error("Error getting area:", areaError);
+        throw areaError;
+      }
+      
+      // Create booking record
       console.log("Creating booking record");
       const { data: bookingData, error: bookingError } = await supabase
         .from("bookings")
@@ -226,6 +266,7 @@ const Book = () => {
         throw bookingError;
       }
       
+      // Update slot status
       console.log("Updating slot status");
       const { error: slotError } = await supabase
         .from("parking_slots")
@@ -238,7 +279,9 @@ const Book = () => {
       }
       
       console.log("Booking successful!");
-      toast.success(`Booking ${bookingType === "immediate" ? "confirmed" : "reserved"}!`);
+      toast.success(`Booking ${bookingType === "immediate" ? "confirmed" : "reserved"}!`, {
+        icon: <Check className="h-5 w-5 text-green-500" />,
+      });
       
       // Add a small delay to show the success message before redirecting
       setTimeout(() => {
@@ -257,7 +300,12 @@ const Book = () => {
     if (loadingSlots) {
       return (
         <div className="flex items-center justify-center h-60">
-          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          <motion.div
+            animate={{ rotate: 360 }}
+            transition={{ repeat: Infinity, duration: 1, ease: "linear" }}
+          >
+            <Loader2 className="h-8 w-8 text-primary" />
+          </motion.div>
         </div>
       );
     }
@@ -265,22 +313,32 @@ const Book = () => {
     if (slots.length === 0) {
       return (
         <div className="flex flex-col items-center justify-center h-60 text-center">
-          <div className="text-4xl mb-3">😢</div>
-          <h3 className="text-xl font-semibold">No slots available</h3>
-          <p className="text-muted-foreground mt-2">Please select a different area or try again later.</p>
+          <motion.div
+            initial={{ scale: 0.8, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            transition={{ duration: 0.5 }}
+          >
+            <div className="text-4xl mb-3">😢</div>
+            <h3 className="text-xl font-semibold">No slots available</h3>
+            <p className="text-muted-foreground mt-2">Please select a different area or try again later.</p>
+          </motion.div>
         </div>
       );
     }
     
     return (
-      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+      <motion.div 
+        variants={staggerChildren}
+        initial="hidden"
+        animate="visible"
+        className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3"
+      >
         {slots.map((slot) => (
           <motion.div
             key={slot.slot_id}
-            initial={{ opacity: 0, scale: 0.8 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ duration: 0.3 }}
+            variants={fadeIn}
             whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.98 }}
             className="aspect-square"
           >
             <button
@@ -300,7 +358,7 @@ const Book = () => {
             </button>
           </motion.div>
         ))}
-      </div>
+      </motion.div>
     );
   };
 
@@ -308,7 +366,12 @@ const Book = () => {
     switch (currentStep) {
       case 1:
         return (
-          <div className="space-y-6">
+          <motion.div 
+            variants={fadeIn}
+            initial="hidden"
+            animate="visible"
+            className="space-y-6"
+          >
             <div className="space-y-2">
               <div className="flex items-center gap-2">
                 <Building className="h-5 w-5 text-primary" />
@@ -335,12 +398,21 @@ const Book = () => {
               </Select>
             </div>
 
-            <div className="h-80 flex flex-col items-center justify-center gap-4 border border-border/50 rounded-lg bg-gradient-to-br from-background to-muted/30 p-6">
+            <motion.div 
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.2 }}
+              className="h-80 flex flex-col items-center justify-center gap-4 border border-border/50 rounded-lg bg-gradient-to-br from-background to-muted/30 p-6"
+            >
               {selectedArea ? (
                 <>
-                  <div className="bg-primary/10 p-4 rounded-full">
+                  <motion.div 
+                    initial={{ scale: 0.8 }}
+                    animate={{ scale: 1 }}
+                    className="bg-primary/10 p-4 rounded-full"
+                  >
                     <MapPin className="h-8 w-8 text-primary" />
-                  </div>
+                  </motion.div>
                   <h3 className="text-xl font-semibold">
                     {areas.find(area => area.area_id === selectedArea)?.area_name}
                   </h3>
@@ -359,12 +431,17 @@ const Book = () => {
                   </p>
                 </>
               )}
-            </div>
-          </div>
+            </motion.div>
+          </motion.div>
         );
       case 2:
         return (
-          <div className="space-y-6">
+          <motion.div 
+            variants={fadeIn}
+            initial="hidden"
+            animate="visible"
+            className="space-y-6"
+          >
             <div className="space-y-2">
               <div className="flex items-center gap-2">
                 <Car className="h-5 w-5 text-primary" />
@@ -372,9 +449,11 @@ const Book = () => {
               </div>
               <div className="flex items-center justify-between">
                 <p className="text-sm text-muted-foreground">Choose an available parking slot</p>
-                <button 
+                <motion.button 
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
                   type="button" 
-                  className="text-xs text-primary hover:underline"
+                  className="text-xs text-primary hover:underline flex items-center gap-1"
                   onClick={() => {
                     setSelectedSlot("");
                     const fetchSlots = async () => {
@@ -397,19 +476,27 @@ const Book = () => {
                     fetchSlots();
                   }}
                 >
+                  <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-1">
+                    <path d="M21 2v6h-6"></path><path d="M3 12a9 9 0 0 1 15-6.7L21 8"></path><path d="M3 12a9 9 0 0 0 15 6.7L21 16"></path><path d="M21 16v6h-6"></path>
+                  </svg>
                   Refresh
-                </button>
+                </motion.button>
               </div>
             </div>
             
             <div className="border border-border/50 rounded-lg p-6 min-h-80">
               <SlotSelector />
             </div>
-          </div>
+          </motion.div>
         );
       case 3:
         return (
-          <div className="space-y-6">
+          <motion.div 
+            variants={fadeIn}
+            initial="hidden"
+            animate="visible"
+            className="space-y-6"
+          >
             <div className="space-y-2">
               <div className="flex items-center gap-2">
                 <CalendarIcon2 className="h-5 w-5 text-primary" />
@@ -428,7 +515,7 @@ const Book = () => {
                         <Button
                           variant="outline"
                           className={cn(
-                            "w-full justify-start text-left font-normal h-12",
+                            "w-full justify-start text-left font-normal h-12 border-border/50",
                             !selectedDate && "text-muted-foreground"
                           )}
                         >
@@ -443,6 +530,7 @@ const Book = () => {
                           onSelect={setSelectedDate}
                           initialFocus
                           disabled={(date) => date < new Date()}
+                          className="rounded-md border border-border/50"
                         />
                       </PopoverContent>
                     </Popover>
@@ -525,11 +613,16 @@ const Book = () => {
                 </div>
               </div>
             </div>
-          </div>
+          </motion.div>
         );
       case 4:
         return (
-          <div className="space-y-6">
+          <motion.div 
+            variants={fadeIn}
+            initial="hidden"
+            animate="visible"
+            className="space-y-6"
+          >
             <div className="space-y-2">
               <div className="flex items-center gap-2">
                 <User className="h-5 w-5 text-primary" />
@@ -554,7 +647,13 @@ const Book = () => {
                   className={cn("h-12", formErrors.vehicleNumber ? "border-red-500 focus-visible:ring-red-500" : "")}
                 />
                 {formErrors.vehicleNumber && (
-                  <p className="text-sm text-red-500">Vehicle number is required</p>
+                  <motion.p 
+                    initial={{ opacity: 0, x: -10 }} 
+                    animate={{ opacity: 1, x: 0 }}
+                    className="text-sm text-red-500"
+                  >
+                    Vehicle number is required
+                  </motion.p>
                 )}
               </div>
               <div className="space-y-2">
@@ -572,7 +671,13 @@ const Book = () => {
                   className={cn("h-12", formErrors.customerName ? "border-red-500 focus-visible:ring-red-500" : "")}
                 />
                 {formErrors.customerName && (
-                  <p className="text-sm text-red-500">Your name is required</p>
+                  <motion.p
+                    initial={{ opacity: 0, x: -10 }} 
+                    animate={{ opacity: 1, x: 0 }}
+                    className="text-sm text-red-500"
+                  >
+                    Your name is required
+                  </motion.p>
                 )}
               </div>
               <div className="space-y-2">
@@ -590,15 +695,26 @@ const Book = () => {
                   className={cn("h-12", formErrors.contactNumber ? "border-red-500 focus-visible:ring-red-500" : "")}
                 />
                 {formErrors.contactNumber && (
-                  <p className="text-sm text-red-500">Contact number is required</p>
+                  <motion.p
+                    initial={{ opacity: 0, x: -10 }} 
+                    animate={{ opacity: 1, x: 0 }}
+                    className="text-sm text-red-500"
+                  >
+                    Contact number is required
+                  </motion.p>
                 )}
               </div>
             </div>
-          </div>
+          </motion.div>
         );
       case 5:
         return (
-          <div className="space-y-6">
+          <motion.div 
+            variants={fadeIn}
+            initial="hidden"
+            animate="visible"
+            className="space-y-6"
+          >
             <div className="space-y-2">
               <div className="flex items-center gap-2">
                 <Check className="h-5 w-5 text-primary" />
@@ -607,45 +723,82 @@ const Book = () => {
               <p className="text-sm text-muted-foreground">Please review your booking details</p>
             </div>
             
-            <div className="border border-border/50 rounded-lg p-6 space-y-4">
+            <motion.div 
+              className="border border-border/50 rounded-lg p-6 space-y-4"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.2 }}
+            >
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-1">
+                <motion.div 
+                  className="space-y-1"
+                  variants={fadeIn}
+                  transition={{ delay: 0.1 }}
+                >
                   <p className="text-sm text-muted-foreground">Area</p>
                   <p className="font-medium">{areas.find(area => area.area_id === selectedArea)?.area_name}</p>
-                </div>
-                <div className="space-y-1">
+                </motion.div>
+                <motion.div 
+                  className="space-y-1"
+                  variants={fadeIn}
+                  transition={{ delay: 0.2 }}
+                >
                   <p className="text-sm text-muted-foreground">Slot</p>
                   <p className="font-medium">{selectedSlot}</p>
-                </div>
-                <div className="space-y-1">
+                </motion.div>
+                <motion.div 
+                  className="space-y-1"
+                  variants={fadeIn}
+                  transition={{ delay: 0.3 }}
+                >
                   <p className="text-sm text-muted-foreground">Date</p>
                   <p className="font-medium">{selectedDate ? format(selectedDate, "PPP") : ""}</p>
-                </div>
-                <div className="space-y-1">
+                </motion.div>
+                <motion.div 
+                  className="space-y-1"
+                  variants={fadeIn}
+                  transition={{ delay: 0.4 }}
+                >
                   <p className="text-sm text-muted-foreground">Booking Type</p>
                   <p className="font-medium capitalize">{bookingType}</p>
-                </div>
-                <div className="space-y-1">
+                </motion.div>
+                <motion.div 
+                  className="space-y-1"
+                  variants={fadeIn}
+                  transition={{ delay: 0.5 }}
+                >
                   <p className="text-sm text-muted-foreground">Vehicle Number</p>
                   <p className="font-medium">{vehicleNumber}</p>
-                </div>
-                <div className="space-y-1">
+                </motion.div>
+                <motion.div 
+                  className="space-y-1"
+                  variants={fadeIn}
+                  transition={{ delay: 0.6 }}
+                >
                   <p className="text-sm text-muted-foreground">Your Name</p>
                   <p className="font-medium">{customerName}</p>
-                </div>
-                <div className="md:col-span-2 space-y-1">
+                </motion.div>
+                <motion.div 
+                  className="md:col-span-2 space-y-1"
+                  variants={fadeIn}
+                  transition={{ delay: 0.7 }}
+                >
                   <p className="text-sm text-muted-foreground">Contact Number</p>
                   <p className="font-medium">{contactNumber}</p>
-                </div>
+                </motion.div>
               </div>
               
-              <div className="mt-6 pt-4 border-t border-border/50">
+              <motion.div 
+                className="mt-6 pt-4 border-t border-border/50"
+                variants={fadeIn}
+                transition={{ delay: 0.8 }}
+              >
                 <p className="text-center">
                   By proceeding, you agree to our terms and conditions for parking reservations.
                 </p>
-              </div>
-            </div>
-          </div>
+              </motion.div>
+            </motion.div>
+          </motion.div>
         );
       default:
         return null;
@@ -653,9 +806,21 @@ const Book = () => {
   };
 
   return (
-    <div className="min-h-screen py-24">
-      <div className="container mx-auto px-4 max-w-4xl">
-        <div className="max-w-4xl mx-auto">
+    <div className="min-h-screen py-24 relative">
+      {/* Background elements */}
+      <div className="absolute inset-0 overflow-hidden -z-10">
+        <div className="absolute top-0 left-0 w-1/3 h-1/3 bg-primary/5 rounded-full blur-3xl transform -translate-x-1/2 -translate-y-1/2"></div>
+        <div className="absolute bottom-0 right-0 w-1/2 h-1/2 bg-blue-500/5 rounded-full blur-3xl transform translate-x-1/3 translate-y-1/3"></div>
+        <div className="absolute top-1/4 right-1/4 w-64 h-64 bg-green-500/5 rounded-full blur-3xl"></div>
+      </div>
+      
+      <div className="container mx-auto px-4 max-w-4xl relative">
+        <motion.div 
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.6 }}
+          className="max-w-4xl mx-auto"
+        >
           <h1 className="text-4xl font-bold mb-8 text-center">Book a Parking Slot</h1>
           
           <Card className="backdrop-blur-lg border border-border/50 shadow-lg">
@@ -687,34 +852,38 @@ const Book = () => {
               </CardContent>
               <CardFooter className="flex flex-col sm:flex-row-reverse justify-between gap-4">
                 {currentStep < 5 ? (
-                  <Button 
-                    type="button" 
-                    onClick={handleNextStep}
-                    className="w-full sm:w-auto"
-                    disabled={
-                      (currentStep === 1 && !selectedArea) || 
-                      (currentStep === 2 && !selectedSlot) || 
-                      (currentStep === 3 && !selectedDate)
-                    }
-                  >
-                    Next Step <ArrowRight className="ml-2 h-4 w-4" />
-                  </Button>
+                  <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
+                    <Button 
+                      type="button" 
+                      onClick={handleNextStep}
+                      className="w-full sm:w-auto"
+                      disabled={
+                        (currentStep === 1 && !selectedArea) || 
+                        (currentStep === 2 && !selectedSlot) || 
+                        (currentStep === 3 && !selectedDate)
+                      }
+                    >
+                      Next Step <ArrowRight className="ml-2 h-4 w-4" />
+                    </Button>
+                  </motion.div>
                 ) : (
-                  <Button 
-                    type="button" 
-                    onClick={handleSubmit}
-                    className="w-full sm:w-auto"
-                    disabled={isLoading || !vehicleNumber || !customerName || !contactNumber}
-                  >
-                    {isLoading ? (
-                      <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Processing...
-                      </>
-                    ) : (
-                      <>Confirm Booking</>
-                    )}
-                  </Button>
+                  <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
+                    <Button 
+                      type="button" 
+                      onClick={handleSubmit}
+                      className="w-full sm:w-auto"
+                      disabled={isLoading || !vehicleNumber || !customerName || !contactNumber}
+                    >
+                      {isLoading ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          Processing...
+                        </>
+                      ) : (
+                        <>Confirm Booking</>
+                      )}
+                    </Button>
+                  </motion.div>
                 )}
                 
                 {currentStep > 1 && (
@@ -731,7 +900,7 @@ const Book = () => {
               </CardFooter>
             </form>
           </Card>
-        </div>
+        </motion.div>
       </div>
     </div>
   );

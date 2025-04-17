@@ -104,6 +104,57 @@ export type Database = {
           },
         ]
       }
+      past_booking: {
+        Row: {
+          amount_paid: number | null
+          area_name: string
+          booking_id: number
+          cancelled_at: string | null
+          contact_number: string
+          created_at: string | null
+          customer_name: string
+          entry_time: string
+          exit_time: string | null
+          id: string
+          payment_status: string | null
+          slot_id: string
+          status: string
+          vehicle_number: string
+        }
+        Insert: {
+          amount_paid?: number | null
+          area_name: string
+          booking_id: number
+          cancelled_at?: string | null
+          contact_number: string
+          created_at?: string | null
+          customer_name: string
+          entry_time: string
+          exit_time?: string | null
+          id?: string
+          payment_status?: string | null
+          slot_id: string
+          status: string
+          vehicle_number: string
+        }
+        Update: {
+          amount_paid?: number | null
+          area_name?: string
+          booking_id?: number
+          cancelled_at?: string | null
+          contact_number?: string
+          created_at?: string | null
+          customer_name?: string
+          entry_time?: string
+          exit_time?: string | null
+          id?: string
+          payment_status?: string | null
+          slot_id?: string
+          status?: string
+          vehicle_number?: string
+        }
+        Relationships: []
+      }
       payments: {
         Row: {
           amount: number
