@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
@@ -12,7 +11,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
-import { CalendarIcon, Loader2, Check, ArrowRight, MapPin, Car, Buildings, Clock, CreditCard, Calendar as CalendarIcon2, User, Phone } from "lucide-react";
+import { CalendarIcon, Loader2, Check, ArrowRight, MapPin, Car, Building, Clock, CreditCard, Calendar as CalendarIcon2, User, Phone } from "lucide-react";
 import { toast } from "@/components/ui/sonner";
 import { motion } from "framer-motion";
 
@@ -125,7 +124,6 @@ const Book = () => {
     try {
       setIsLoading(true);
       
-      // First check if vehicle exists
       const { data: existingVehicleData, error: vehicleQueryError } = await supabase
         .from("vehicles")
         .select("*")
@@ -133,7 +131,6 @@ const Book = () => {
       
       if (vehicleQueryError) throw vehicleQueryError;
       
-      // If vehicle doesn't exist, create it
       if (!existingVehicleData || existingVehicleData.length === 0) {
         const { error: insertVehicleError } = await supabase
           .from("vehicles")
@@ -151,7 +148,6 @@ const Book = () => {
         }
       }
       
-      // Create the booking
       const { data: bookingData, error: bookingError } = await supabase
         .from("bookings")
         .insert([
@@ -171,7 +167,6 @@ const Book = () => {
         throw bookingError;
       }
       
-      // Update slot status to booked
       const { error: slotError } = await supabase
         .from("parking_slots")
         .update({ status: "booked" })
@@ -250,7 +245,7 @@ const Book = () => {
           <div className="space-y-6">
             <div className="space-y-2">
               <div className="flex items-center gap-2">
-                <Buildings className="h-5 w-5 text-primary" />
+                <Building className="h-5 w-5 text-primary" />
                 <Label htmlFor="area" className="text-lg">Select Parking Area</Label>
               </div>
               <p className="text-sm text-muted-foreground">Choose the parking area where you want to park your vehicle</p>
@@ -512,7 +507,6 @@ const Book = () => {
           </div>
         );
       case 5:
-        // Confirmation step
         return (
           <div className="space-y-6">
             <div className="space-y-2">
@@ -589,7 +583,6 @@ const Book = () => {
                   </div>
                 </div>
                 
-                {/* Progress Bar */}
                 <div className="w-full h-2 bg-muted/50 rounded-full mt-4 overflow-hidden">
                   <motion.div
                     className="h-full bg-primary"
