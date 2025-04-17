@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
@@ -43,6 +44,11 @@ const Book = () => {
   const [currentStep, setCurrentStep] = useState(1);
   const [bookingType, setBookingType] = useState<"reserve" | "immediate">("immediate");
   const [loadingSlots, setLoadingSlots] = useState(false);
+  const [formErrors, setFormErrors] = useState({
+    vehicleNumber: false,
+    customerName: false,
+    contactNumber: false
+  });
 
   useEffect(() => {
     if (!user) {
@@ -50,12 +56,22 @@ const Book = () => {
     }
   }, [user, navigate]);
 
+  // Fetch all areas when component mounts
   useEffect(() => {
     const fetchAreas = async () => {
       try {
         const { data, error } = await supabase.from("areas").select("*");
-        if (error) throw error;
-        setAreas(data || []);
+        if (error) {
+          console.error("Error fetching areas:", error);
+          throw error;
+        }
+        if (data) {
+          setAreas(data);
+          console.log("Areas loaded:", data.length);
+        } else {
+          console.log("No areas found");
+          setAreas([]);
+        }
       } catch (error) {
         console.error("Error fetching areas:", error);
         toast.error("Failed to load areas");
@@ -65,6 +81,7 @@ const Book = () => {
     fetchAreas();
   }, []);
 
+  // Fetch available slots when selected area changes
   useEffect(() => {
     const fetchSlots = async () => {
       if (!selectedArea) return;
@@ -77,8 +94,18 @@ const Book = () => {
           .eq("area_id", selectedArea)
           .eq("status", "available");
           
-        if (error) throw error;
-        setSlots(data || []);
+        if (error) {
+          console.error("Error fetching slots:", error);
+          throw error;
+        }
+        
+        if (data) {
+          setSlots(data);
+          console.log("Available slots loaded:", data.length);
+        } else {
+          console.log("No available slots found");
+          setSlots([]);
+        }
       } catch (error) {
         console.error("Error fetching slots:", error);
         toast.error("Failed to load available slots");
@@ -89,6 +116,17 @@ const Book = () => {
 
     fetchSlots();
   }, [selectedArea]);
+
+  const validateForm = () => {
+    const errors = {
+      vehicleNumber: !vehicleNumber.trim(),
+      customerName: !customerName.trim(),
+      contactNumber: !contactNumber.trim()
+    };
+    
+    setFormErrors(errors);
+    return !Object.values(errors).some(Boolean);
+  };
 
   const handleNextStep = () => {
     if (currentStep === 1 && !selectedArea) {
@@ -106,6 +144,13 @@ const Book = () => {
       return;
     }
     
+    if (currentStep === 4) {
+      if (!validateForm()) {
+        toast.error("Please fill in all required fields");
+        return;
+      }
+    }
+    
     setCurrentStep(currentStep + 1);
   };
 
@@ -116,22 +161,33 @@ const Book = () => {
   const handleSubmit = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     
-    if (!selectedArea || !selectedSlot || !selectedDate || !vehicleNumber || !customerName || !contactNumber) {
-      toast.error("Please fill in all fields");
+    if (!validateForm()) {
+      toast.error("Please fill in all required fields");
+      return;
+    }
+    
+    if (!selectedArea || !selectedSlot || !selectedDate) {
+      toast.error("Missing booking information. Please start over.");
+      setCurrentStep(1);
       return;
     }
     
     try {
       setIsLoading(true);
+      console.log("Starting booking process...");
       
       const { data: existingVehicleData, error: vehicleQueryError } = await supabase
         .from("vehicles")
         .select("*")
         .eq("vehicle_number", vehicleNumber);
       
-      if (vehicleQueryError) throw vehicleQueryError;
+      if (vehicleQueryError) {
+        console.error("Error checking vehicle:", vehicleQueryError);
+        throw vehicleQueryError;
+      }
       
       if (!existingVehicleData || existingVehicleData.length === 0) {
+        console.log("Creating new vehicle record");
         const { error: insertVehicleError } = await supabase
           .from("vehicles")
           .insert([
@@ -146,8 +202,11 @@ const Book = () => {
           console.error("Error creating vehicle:", insertVehicleError);
           throw insertVehicleError;
         }
+      } else {
+        console.log("Vehicle already exists");
       }
       
+      console.log("Creating booking record");
       const { data: bookingData, error: bookingError } = await supabase
         .from("bookings")
         .insert([
@@ -167,6 +226,7 @@ const Book = () => {
         throw bookingError;
       }
       
+      console.log("Updating slot status");
       const { error: slotError } = await supabase
         .from("parking_slots")
         .update({ status: "booked" })
@@ -177,11 +237,17 @@ const Book = () => {
         throw slotError;
       }
       
+      console.log("Booking successful!");
       toast.success(`Booking ${bookingType === "immediate" ? "confirmed" : "reserved"}!`);
-      navigate("/bookings");
-    } catch (error) {
+      
+      // Add a small delay to show the success message before redirecting
+      setTimeout(() => {
+        navigate("/bookings");
+      }, 1500);
+      
+    } catch (error: any) {
       console.error("Error creating booking:", error);
-      toast.error("Failed to create booking");
+      toast.error(`Booking failed: ${error.message || "Unknown error"}`);
     } finally {
       setIsLoading(false);
     }
@@ -478,30 +544,54 @@ const Book = () => {
                 <Input
                   id="vehicleNumber"
                   value={vehicleNumber}
-                  onChange={(e) => setVehicleNumber(e.target.value)}
+                  onChange={(e) => {
+                    setVehicleNumber(e.target.value);
+                    if (e.target.value) {
+                      setFormErrors(prev => ({ ...prev, vehicleNumber: false }));
+                    }
+                  }}
                   placeholder="e.g., ABC123"
-                  className="h-12"
+                  className={cn("h-12", formErrors.vehicleNumber ? "border-red-500 focus-visible:ring-red-500" : "")}
                 />
+                {formErrors.vehicleNumber && (
+                  <p className="text-sm text-red-500">Vehicle number is required</p>
+                )}
               </div>
               <div className="space-y-2">
                 <Label htmlFor="customerName">Your Name</Label>
                 <Input
                   id="customerName"
                   value={customerName}
-                  onChange={(e) => setCustomerName(e.target.value)}
+                  onChange={(e) => {
+                    setCustomerName(e.target.value);
+                    if (e.target.value) {
+                      setFormErrors(prev => ({ ...prev, customerName: false }));
+                    }
+                  }}
                   placeholder="Enter your name"
-                  className="h-12"
+                  className={cn("h-12", formErrors.customerName ? "border-red-500 focus-visible:ring-red-500" : "")}
                 />
+                {formErrors.customerName && (
+                  <p className="text-sm text-red-500">Your name is required</p>
+                )}
               </div>
               <div className="space-y-2">
                 <Label htmlFor="contactNumber">Contact Number</Label>
                 <Input
                   id="contactNumber"
                   value={contactNumber}
-                  onChange={(e) => setContactNumber(e.target.value)}
+                  onChange={(e) => {
+                    setContactNumber(e.target.value);
+                    if (e.target.value) {
+                      setFormErrors(prev => ({ ...prev, contactNumber: false }));
+                    }
+                  }}
                   placeholder="Enter your contact number"
-                  className="h-12"
+                  className={cn("h-12", formErrors.contactNumber ? "border-red-500 focus-visible:ring-red-500" : "")}
                 />
+                {formErrors.contactNumber && (
+                  <p className="text-sm text-red-500">Contact number is required</p>
+                )}
               </div>
             </div>
           </div>
