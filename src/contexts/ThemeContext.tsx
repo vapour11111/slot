@@ -41,18 +41,17 @@ export function ThemeProvider({
         ? "dark"
         : "light";
       
-      root.classList.add(systemTheme);
-      
       // Add animation class for smooth transition
       root.classList.add("theme-transition");
-      setTimeout(() => root.classList.remove("theme-transition"), 500);
+      root.classList.add(systemTheme);
+      setTimeout(() => root.classList.remove("theme-transition"), 1000);
       return;
     }
 
     // Add animation class for smooth transition
     root.classList.add("theme-transition");
     root.classList.add(theme);
-    setTimeout(() => root.classList.remove("theme-transition"), 500);
+    setTimeout(() => root.classList.remove("theme-transition"), 1000);
   }, [theme]);
 
   // Listen for system theme changes when in system mode
@@ -65,7 +64,11 @@ export function ThemeProvider({
       root.classList.remove("light", "dark");
       
       const systemTheme = mediaQuery.matches ? "dark" : "light";
+      
+      // Add animation class for smooth transition
+      root.classList.add("theme-transition");
       root.classList.add(systemTheme);
+      setTimeout(() => root.classList.remove("theme-transition"), 1000);
     };
 
     mediaQuery.addEventListener("change", handleChange);
