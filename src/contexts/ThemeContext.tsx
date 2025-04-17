@@ -40,11 +40,36 @@ export function ThemeProvider({
         .matches
         ? "dark"
         : "light";
+      
       root.classList.add(systemTheme);
+      
+      // Add animation class for smooth transition
+      root.classList.add("theme-transition");
+      setTimeout(() => root.classList.remove("theme-transition"), 500);
       return;
     }
 
+    // Add animation class for smooth transition
+    root.classList.add("theme-transition");
     root.classList.add(theme);
+    setTimeout(() => root.classList.remove("theme-transition"), 500);
+  }, [theme]);
+
+  // Listen for system theme changes when in system mode
+  useEffect(() => {
+    if (theme !== "system") return;
+
+    const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
+    const handleChange = () => {
+      const root = window.document.documentElement;
+      root.classList.remove("light", "dark");
+      
+      const systemTheme = mediaQuery.matches ? "dark" : "light";
+      root.classList.add(systemTheme);
+    };
+
+    mediaQuery.addEventListener("change", handleChange);
+    return () => mediaQuery.removeEventListener("change", handleChange);
   }, [theme]);
 
   const value = {

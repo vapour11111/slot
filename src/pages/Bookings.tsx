@@ -1,6 +1,5 @@
-
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -58,21 +57,18 @@ const Bookings = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
 
-  // Redirect if not logged in
   useEffect(() => {
     if (!user) {
       navigate("/auth");
     }
   }, [user, navigate]);
 
-  // Fetch bookings
   useEffect(() => {
     const fetchBookings = async () => {
       if (!user) return;
       
       try {
         setIsLoading(true);
-        // Fetch bookings with vehicle numbers that user has used
         const { data: vehicleData, error: vehicleError } = await supabase
           .from("vehicles")
           .select("vehicle_number");
@@ -106,7 +102,6 @@ const Bookings = () => {
     fetchBookings();
   }, [user]);
 
-  // Handle search
   useEffect(() => {
     if (!searchTerm.trim()) {
       setFilteredBookings(bookings);
@@ -126,7 +121,7 @@ const Bookings = () => {
 
   return (
     <div className="min-h-screen py-24">
-      <div className="container mx-auto px-4">
+      <div className="container mx-auto px-4 max-w-6xl">
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
           <div>
             <h1 className="text-4xl font-bold">Your Bookings</h1>

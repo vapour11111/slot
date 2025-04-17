@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
@@ -41,14 +40,12 @@ const Book = () => {
   const [customerName, setCustomerName] = useState("");
   const [contactNumber, setContactNumber] = useState("");
 
-  // Redirect if not logged in
   useEffect(() => {
     if (!user) {
       navigate("/auth");
     }
   }, [user, navigate]);
 
-  // Fetch areas
   useEffect(() => {
     const fetchAreas = async () => {
       try {
@@ -64,7 +61,6 @@ const Book = () => {
     fetchAreas();
   }, []);
 
-  // Fetch slots based on selected area
   useEffect(() => {
     const fetchSlots = async () => {
       if (!selectedArea) return;
@@ -101,13 +97,11 @@ const Book = () => {
     try {
       setIsLoading(true);
       
-      // First, check if vehicle exists
       const { data: vehicleData, error: vehicleError } = await supabase
         .from("vehicles")
         .select("vehicle_number")
         .eq("vehicle_number", vehicleNumber);
       
-      // If vehicle doesn't exist, create it
       if (!vehicleError && (!vehicleData || vehicleData.length === 0)) {
         const { error: insertError } = await supabase
           .from("vehicles")
@@ -122,7 +116,6 @@ const Book = () => {
         if (insertError) throw insertError;
       }
       
-      // Create booking
       const { data: bookingData, error: bookingError } = await supabase
         .from("bookings")
         .insert([
@@ -131,19 +124,26 @@ const Book = () => {
             slot_id: selectedSlot,
             entry_time: selectedDate.toISOString(),
             status: "booked",
+            payment_status: "pending",
+            amount_paid: 0
           },
         ])
         .select();
       
-      if (bookingError) throw bookingError;
+      if (bookingError) {
+        console.error("Error creating booking:", bookingError);
+        throw bookingError;
+      }
       
-      // Update slot status
       const { error: slotError } = await supabase
         .from("parking_slots")
         .update({ status: "booked" })
         .eq("slot_id", selectedSlot);
       
-      if (slotError) throw slotError;
+      if (slotError) {
+        console.error("Error updating slot status:", slotError);
+        throw slotError;
+      }
       
       toast.success("Booking successful!");
       navigate("/bookings");
@@ -159,7 +159,7 @@ const Book = () => {
 
   return (
     <div className="min-h-screen py-24">
-      <div className="container mx-auto px-4">
+      <div className="container mx-auto px-4 max-w-4xl">
         <div className="max-w-4xl mx-auto">
           <h1 className="text-4xl font-bold mb-8">Book a Parking Slot</h1>
           
@@ -173,7 +173,6 @@ const Book = () => {
               </CardHeader>
               <CardContent className="space-y-6">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  {/* Area Selection */}
                   <div className="space-y-2">
                     <Label htmlFor="area">Area</Label>
                     <Select 
@@ -193,7 +192,6 @@ const Book = () => {
                     </Select>
                   </div>
                   
-                  {/* Slot Selection */}
                   <div className="space-y-2">
                     <Label htmlFor="slot">Slot</Label>
                     <Select
@@ -221,7 +219,6 @@ const Book = () => {
                     </Select>
                   </div>
                   
-                  {/* Date Selection */}
                   <div className="space-y-2">
                     <Label>Date</Label>
                     <Popover>
