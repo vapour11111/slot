@@ -11,10 +11,13 @@ import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
-import { format } from "date-fns";
+import { format, addHours } from "date-fns";
 import { CalendarIcon, Loader2, Check, ArrowRight, MapPin, Car, Building, Clock, CreditCard, Calendar as CalendarIcon2, User, Phone } from "lucide-react";
 import { toast } from "@/components/ui/sonner";
 import { motion } from "framer-motion";
+import GoogleMap from "@/components/GoogleMap";
+import ExitTimeSelector from "@/components/ExitTimeSelector";
+import { formatInIST, formatPriceINR } from "@/utils/timeAndPriceUtils";
 
 // Type definitions
 type Area = {
@@ -63,6 +66,8 @@ const Book = () => {
   const [selectedArea, setSelectedArea] = useState<string>("");
   const [selectedSlot, setSelectedSlot] = useState<string>("");
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
+  const [exitTime, setExitTime] = useState<Date | null>(null);
+  const [estimatedPrice, setEstimatedPrice] = useState<number>(0);
   const [vehicleNumber, setVehicleNumber] = useState("");
   const [customerName, setCustomerName] = useState("");
   const [contactNumber, setContactNumber] = useState("");
@@ -142,6 +147,11 @@ const Book = () => {
     fetchSlots();
   }, [selectedArea]);
 
+  const handleExitTimeChange = (time: Date, price: number) => {
+    setExitTime(time);
+    setEstimatedPrice(price);
+  };
+
   const validateForm = () => {
     const errors = {
       vehicleNumber: !vehicleNumber.trim(),
@@ -164,9 +174,16 @@ const Book = () => {
       return;
     }
     
-    if (currentStep === 3 && !selectedDate) {
-      toast.error("Please select a date");
-      return;
+    if (currentStep === 3) {
+      if (!selectedDate) {
+        toast.error("Please select a date");
+        return;
+      }
+      
+      if (!exitTime) {
+        toast.error("Please select an exit time");
+        return;
+      }
     }
     
     if (currentStep === 4) {
@@ -191,7 +208,7 @@ const Book = () => {
       return;
     }
     
-    if (!selectedArea || !selectedSlot || !selectedDate) {
+    if (!selectedArea || !selectedSlot || !selectedDate || !exitTime) {
       toast.error("Missing booking information. Please start over.");
       setCurrentStep(1);
       return;
@@ -254,9 +271,10 @@ const Book = () => {
             vehicle_number: vehicleNumber,
             slot_id: selectedSlot,
             entry_time: selectedDate.toISOString(),
+            exit_time: exitTime.toISOString(),
             status: "booked",
             payment_status: "pending",
-            amount_paid: 0
+            amount_paid: estimatedPrice
           },
         ])
         .select();
@@ -398,40 +416,28 @@ const Book = () => {
               </Select>
             </div>
 
-            <motion.div 
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.2 }}
-              className="h-80 flex flex-col items-center justify-center gap-4 border border-border/50 rounded-lg bg-gradient-to-br from-background to-muted/30 p-6"
-            >
-              {selectedArea ? (
-                <>
-                  <motion.div 
-                    initial={{ scale: 0.8 }}
-                    animate={{ scale: 1 }}
-                    className="bg-primary/10 p-4 rounded-full"
-                  >
-                    <MapPin className="h-8 w-8 text-primary" />
-                  </motion.div>
-                  <h3 className="text-xl font-semibold">
-                    {areas.find(area => area.area_id === selectedArea)?.area_name}
-                  </h3>
-                  <p className="text-muted-foreground text-center">
-                    Please proceed to the next step to select a parking slot in this area.
-                  </p>
-                </>
-              ) : (
-                <>
-                  <div className="bg-muted/50 p-4 rounded-full">
-                    <MapPin className="h-8 w-8 text-muted-foreground" />
-                  </div>
-                  <h3 className="text-xl font-semibold">No Area Selected</h3>
-                  <p className="text-muted-foreground text-center">
-                    Please select a parking area from the dropdown above.
-                  </p>
-                </>
-              )}
-            </motion.div>
+            {selectedArea ? (
+              <GoogleMap 
+                destinationLat={areas.find(area => area.area_id === selectedArea)?.latitude || null}
+                destinationLng={areas.find(area => area.area_id === selectedArea)?.longitude || null}
+                locationName={areas.find(area => area.area_id === selectedArea)?.area_name || "Selected Location"}
+              />
+            ) : (
+              <motion.div 
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.2 }}
+                className="h-80 flex flex-col items-center justify-center gap-4 border border-border/50 rounded-lg bg-gradient-to-br from-background to-muted/30 p-6"
+              >
+                <div className="bg-muted/50 p-4 rounded-full">
+                  <MapPin className="h-8 w-8 text-muted-foreground" />
+                </div>
+                <h3 className="text-xl font-semibold">No Area Selected</h3>
+                <p className="text-muted-foreground text-center">
+                  Please select a parking area from the dropdown above.
+                </p>
+              </motion.div>
+            )}
           </motion.div>
         );
       case 2:
@@ -527,7 +533,10 @@ const Book = () => {
                         <Calendar
                           mode="single"
                           selected={selectedDate}
-                          onSelect={setSelectedDate}
+                          onSelect={(date) => {
+                            setSelectedDate(date);
+                            setExitTime(null); // Reset exit time when date changes
+                          }}
                           initialFocus
                           disabled={(date) => date < new Date()}
                           className="rounded-md border border-border/50"
@@ -536,6 +545,20 @@ const Book = () => {
                     </Popover>
                   </div>
                 </div>
+                
+                {selectedDate && (
+                  <motion.div
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    className="w-full space-y-2 mt-2"
+                  >
+                    <ExitTimeSelector
+                      entryTime={selectedDate}
+                      selectedExitTime={exitTime}
+                      onExitTimeChange={handleExitTimeChange}
+                    />
+                  </motion.div>
+                )}
                 
                 <div className="w-full space-y-2 mt-4">
                   <Label>Booking Type</Label>
@@ -729,7 +752,7 @@ const Book = () => {
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.2 }}
             >
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <motion.div 
                   className="space-y-1"
                   variants={fadeIn}
@@ -751,13 +774,29 @@ const Book = () => {
                   variants={fadeIn}
                   transition={{ delay: 0.3 }}
                 >
-                  <p className="text-sm text-muted-foreground">Date</p>
-                  <p className="font-medium">{selectedDate ? format(selectedDate, "PPP") : ""}</p>
+                  <p className="text-sm text-muted-foreground">Entry Time</p>
+                  <p className="font-medium">{selectedDate ? formatInIST(selectedDate) : ""}</p>
                 </motion.div>
                 <motion.div 
                   className="space-y-1"
                   variants={fadeIn}
                   transition={{ delay: 0.4 }}
+                >
+                  <p className="text-sm text-muted-foreground">Exit Time</p>
+                  <p className="font-medium">{exitTime ? formatInIST(exitTime) : ""}</p>
+                </motion.div>
+                <motion.div 
+                  className="space-y-1"
+                  variants={fadeIn}
+                  transition={{ delay: 0.5 }}
+                >
+                  <p className="text-sm text-muted-foreground">Estimated Price</p>
+                  <p className="font-medium text-primary">{formatPriceINR(estimatedPrice)}</p>
+                </motion.div>
+                <motion.div 
+                  className="space-y-1"
+                  variants={fadeIn}
+                  transition={{ delay: 0.6 }}
                 >
                   <p className="text-sm text-muted-foreground">Booking Type</p>
                   <p className="font-medium capitalize">{bookingType}</p>
@@ -765,7 +804,7 @@ const Book = () => {
                 <motion.div 
                   className="space-y-1"
                   variants={fadeIn}
-                  transition={{ delay: 0.5 }}
+                  transition={{ delay: 0.7 }}
                 >
                   <p className="text-sm text-muted-foreground">Vehicle Number</p>
                   <p className="font-medium">{vehicleNumber}</p>
@@ -773,7 +812,7 @@ const Book = () => {
                 <motion.div 
                   className="space-y-1"
                   variants={fadeIn}
-                  transition={{ delay: 0.6 }}
+                  transition={{ delay: 0.8 }}
                 >
                   <p className="text-sm text-muted-foreground">Your Name</p>
                   <p className="font-medium">{customerName}</p>
@@ -781,7 +820,7 @@ const Book = () => {
                 <motion.div 
                   className="md:col-span-2 space-y-1"
                   variants={fadeIn}
-                  transition={{ delay: 0.7 }}
+                  transition={{ delay: 0.9 }}
                 >
                   <p className="text-sm text-muted-foreground">Contact Number</p>
                   <p className="font-medium">{contactNumber}</p>
@@ -791,7 +830,7 @@ const Book = () => {
               <motion.div 
                 className="mt-6 pt-4 border-t border-border/50"
                 variants={fadeIn}
-                transition={{ delay: 0.8 }}
+                transition={{ delay: 1.0 }}
               >
                 <p className="text-center">
                   By proceeding, you agree to our terms and conditions for parking reservations.
@@ -806,12 +845,22 @@ const Book = () => {
   };
 
   return (
-    <div className="min-h-screen py-24 relative">
-      {/* Background elements */}
+    <div className="min-h-screen py-24 relative overflow-hidden">
+      {/* Enhanced background elements */}
       <div className="absolute inset-0 overflow-hidden -z-10">
         <div className="absolute top-0 left-0 w-1/3 h-1/3 bg-primary/5 rounded-full blur-3xl transform -translate-x-1/2 -translate-y-1/2"></div>
         <div className="absolute bottom-0 right-0 w-1/2 h-1/2 bg-blue-500/5 rounded-full blur-3xl transform translate-x-1/3 translate-y-1/3"></div>
         <div className="absolute top-1/4 right-1/4 w-64 h-64 bg-green-500/5 rounded-full blur-3xl"></div>
+        
+        {/* Additional decorative elements */}
+        <div className="absolute top-1/3 left-1/4 w-40 h-40 bg-purple-500/5 rounded-full blur-2xl"></div>
+        <div className="absolute bottom-1/4 left-1/5 w-32 h-32 bg-yellow-500/5 rounded-full blur-2xl"></div>
+        
+        {/* Animated background particles */}
+        <div className="absolute top-20 right-40 w-3 h-3 bg-primary/30 rounded-full animate-float"></div>
+        <div className="absolute top-1/2 right-1/4 w-2 h-2 bg-blue-500/30 rounded-full animate-float" style={{animationDelay: '1s'}}></div>
+        <div className="absolute bottom-40 left-1/3 w-4 h-4 bg-green-500/30 rounded-full animate-float" style={{animationDelay: '2s'}}></div>
+        <div className="absolute top-1/3 left-40 w-2 h-2 bg-purple-500/30 rounded-full animate-float" style={{animationDelay: '3s'}}></div>
       </div>
       
       <div className="container mx-auto px-4 max-w-4xl relative">
@@ -823,7 +872,7 @@ const Book = () => {
         >
           <h1 className="text-4xl font-bold mb-8 text-center">Book a Parking Slot</h1>
           
-          <Card className="backdrop-blur-lg border border-border/50 shadow-lg">
+          <Card className="backdrop-blur-lg border border-border/50 shadow-lg glassmorphism">
             <form onSubmit={(e) => e.preventDefault()}>
               <CardHeader>
                 <div className="flex justify-between items-center">
@@ -860,7 +909,7 @@ const Book = () => {
                       disabled={
                         (currentStep === 1 && !selectedArea) || 
                         (currentStep === 2 && !selectedSlot) || 
-                        (currentStep === 3 && !selectedDate)
+                        (currentStep === 3 && (!selectedDate || !exitTime))
                       }
                     >
                       Next Step <ArrowRight className="ml-2 h-4 w-4" />
