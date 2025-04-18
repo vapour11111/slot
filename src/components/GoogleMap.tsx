@@ -27,8 +27,8 @@ const GoogleMap = ({ destinationLat, destinationLng, locationName }: GoogleMapPr
   } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const mapRef = useRef<HTMLDivElement>(null);
-  const mapInstance = useRef<google.maps.Map | null>(null);
-  const directionsRenderer = useRef<google.maps.DirectionsRenderer | null>(null);
+  const mapInstance = useRef<any>(null);
+  const directionsRenderer = useRef<any>(null);
   
   // Google Maps API key
   const API_KEY = "AIzaSyDhZOqoqZhZWMKJxHGOQpgZqQEHoQQm5Hs";
