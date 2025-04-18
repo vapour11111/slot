@@ -4,6 +4,14 @@ import { Card, CardContent } from "./ui/card";
 import { Button } from "./ui/button";
 import { Loader2, Navigation, Info, Route } from "lucide-react";
 
+// Add Google Maps type definitions
+declare global {
+  interface Window {
+    google: any;
+    initMap: () => void;
+  }
+}
+
 type GoogleMapProps = {
   destinationLat: number | null;
   destinationLng: number | null;
@@ -21,6 +29,9 @@ const GoogleMap = ({ destinationLat, destinationLng, locationName }: GoogleMapPr
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstance = useRef<google.maps.Map | null>(null);
   const directionsRenderer = useRef<google.maps.DirectionsRenderer | null>(null);
+  
+  // Google Maps API key
+  const API_KEY = "AIzaSyDhZOqoqZhZWMKJxHGOQpgZqQEHoQQm5Hs";
 
   useEffect(() => {
     // Check if destination coordinates are available
@@ -33,11 +44,15 @@ const GoogleMap = ({ destinationLat, destinationLng, locationName }: GoogleMapPr
     // Load the Google Maps script
     const loadGoogleMapsScript = () => {
       const script = document.createElement("script");
-      script.src = `https://maps.googleapis.com/maps/api/js?key=&libraries=places`;
+      script.src = `https://maps.googleapis.com/maps/api/js?key=${API_KEY}&libraries=places&callback=initMap`;
       script.async = true;
       script.defer = true;
-      script.onload = getUserLocation;
       document.head.appendChild(script);
+    };
+
+    // Initialize the map after the script loads
+    window.initMap = () => {
+      getUserLocation();
     };
 
     // Get user's current location
@@ -66,15 +81,20 @@ const GoogleMap = ({ destinationLat, destinationLng, locationName }: GoogleMapPr
     } else {
       loadGoogleMapsScript();
     }
+
+    return () => {
+      // Clean up by removing the global callback
+      window.initMap = () => {};
+    };
   }, [destinationLat, destinationLng]);
 
   // Initialize map when user location is available
   useEffect(() => {
-    if (!userLocation || !mapRef.current || !destinationLat || !destinationLng) return;
+    if (!userLocation || !mapRef.current || !destinationLat || !destinationLng || !window.google || !window.google.maps) return;
 
     try {
       // Create map
-      mapInstance.current = new google.maps.Map(mapRef.current, {
+      mapInstance.current = new window.google.maps.Map(mapRef.current, {
         center: { lat: userLocation.lat, lng: userLocation.lng },
         zoom: 12,
         mapTypeControl: false,
@@ -150,8 +170,8 @@ const GoogleMap = ({ destinationLat, destinationLng, locationName }: GoogleMapPr
       });
 
       // Create directions service and renderer
-      const directionsService = new google.maps.DirectionsService();
-      directionsRenderer.current = new google.maps.DirectionsRenderer({
+      const directionsService = new window.google.maps.DirectionsService();
+      directionsRenderer.current = new window.google.maps.DirectionsRenderer({
         map: mapInstance.current,
         suppressMarkers: false,
         polylineOptions: {
@@ -164,12 +184,12 @@ const GoogleMap = ({ destinationLat, destinationLng, locationName }: GoogleMapPr
       // Get directions
       directionsService.route(
         {
-          origin: new google.maps.LatLng(userLocation.lat, userLocation.lng),
-          destination: new google.maps.LatLng(destinationLat, destinationLng),
-          travelMode: google.maps.TravelMode.DRIVING
+          origin: new window.google.maps.LatLng(userLocation.lat, userLocation.lng),
+          destination: new window.google.maps.LatLng(destinationLat, destinationLng),
+          travelMode: window.google.maps.TravelMode.DRIVING
         },
         (result, status) => {
-          if (status === google.maps.DirectionsStatus.OK && result) {
+          if (status === window.google.maps.DirectionsStatus.OK && result) {
             directionsRenderer.current?.setDirections(result);
             
             const route = result.routes[0];
